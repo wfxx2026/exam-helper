@@ -38,7 +38,7 @@
 (function() {
     'use strict';
 
-    // ==================== 配置：改成你的 GitHub 仓库 ====================
+    // ==================== 配置 ====================
     const GITHUB_USER = 'wfxx2026';      // 
     const GITHUB_REPO = 'exam-helper';          // 
     const GITHUB_BRANCH = 'main';             // 
