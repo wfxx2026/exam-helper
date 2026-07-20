@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>考试助手 - 授权管理后台</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .login-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+            display: flex; justify-content: center; align-items: center; z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+        .login-box {
+            background: white; padding: 40px; border-radius: 20px;
+            width: 90%; max-width: 400px; text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .login-box h2 { margin-bottom: 10px; color: #667eea; }
+        .login-box p { color: #888; margin-bottom: 25px; font-size: 14px; }
+        .login-box input {
+            width: 100%; padding: 14px; border: 2px solid #e1e5e9;
+            border-radius: 12px; font-size: 16px; text-align: center;
+            margin-bottom: 15px; outline: none; transition: border-color 0.3s;
+        }
+        .login-box input:focus { border-color: #667eea; }
+        .login-box button {
+            width: 100%; padding: 14px; background: linear-gradient(135deg,#667eea,#764ba2);
+            color: white; border: none; border-radius: 12px; font-size: 16px;
+            font-weight: bold; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .login-box button:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(102,126,234,0.4); }
+        .login-error { color: #ff4757; font-size: 13px; margin-top: 10px; display: none; }
+
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header {
+            background: rgba(255,255,255,0.95); border-radius: 16px; padding: 25px 30px;
+            margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;
+        }
+        .header h1 { font-size: 24px; color: #333; display: flex; align-items: center; gap: 10px; }
+        .header .version { font-size: 12px; color: #888; background: #f0f2f5; padding: 4px 10px; border-radius: 20px; }
+        .stats {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.95); border-radius: 16px; padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        .stat-card .label { font-size: 13px; color: #888; margin-bottom: 5px; }
+        .stat-card .value { font-size: 28px; font-weight: bold; color: #667eea; }
+        .main-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+        }
+        @media (max-width: 900px) { .main-grid { grid-template-columns: 1fr; } }
+
+        .panel {
+            background: rgba(255,255,255,0.95); border-radius: 16px; padding: 25px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        .panel h3 {
+            font-size: 16px; margin-bottom: 20px; padding-bottom: 12px;
+            border-bottom: 2px solid #f0f2f5; display: flex; align-items: center; gap: 8px;
+        }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; font-weight: 500; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 12px; border: 2px solid #e1e5e9; border-radius: 10px;
+            font-size: 14px; outline: none; transition: all 0.3s; font-family: monospace;
+        }
+        .form-group input:focus, .form-group select:focus { border-color: #667eea; }
+        .btn {
+            padding: 10px 20px; border: none; border-radius: 10px; font-size: 14px;
+            font-weight: 600; cursor: pointer; transition: all 0.2s; display: inline-flex;
+            align-items: center; gap: 6px;
+        }
+        .btn-primary { background: linear-gradient(135deg,#667eea,#764ba2); color: white; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(102,126,234,0.4); }
+        .btn-success { background: linear-gradient(135deg,#00b09b,#96c93d); color: white; }
+        .btn-danger { background: linear-gradient(135deg,#ff6b6b,#ee5a5a); color: white; }
+        .btn-secondary { background: #f0f2f5; color: #666; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+        .user-list { max-height: 400px; overflow-y: auto; }
+        .user-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px; border-radius: 10px; margin-bottom: 8px;
+            background: #f8f9fa; transition: all 0.2s;
+        }
+        .user-item:hover { background: #eef0f5; }
+        .user-info { display: flex; flex-direction: column; gap: 2px; }
+        .user-id { font-family: monospace; font-size: 13px; color: #667eea; font-weight: 600; }
+        .user-mask { font-size: 11px; color: #888; }
+        .user-actions { display: flex; gap: 6px; }
+
+        .result-box {
+            background: #f8f9fa; border-radius: 10px; padding: 15px; margin-top: 15px;
+            font-family: monospace; font-size: 13px; word-break: break-all;
+            border-left: 3px solid #667eea;
+        }
+        .json-preview {
+            background: #1e1e1e; color: #d4d4d4; border-radius: 10px; padding: 15px;
+            font-family: 'Consolas', monospace; font-size: 12px; line-height: 1.6;
+            max-height: 300px; overflow-y: auto; white-space: pre-wrap; word-break: break-all;
+        }
+        .json-key { color: #9cdcfe; }
+        .json-string { color: #ce9178; }
+        .json-number { color: #b5cea8; }
+        .json-boolean { color: #569cd6; }
+
+        .toast {
+            position: fixed; bottom: 30px; right: 30px; background: #333; color: white;
+            padding: 12px 20px; border-radius: 10px; font-size: 14px; z-index: 9999;
+            transform: translateY(100px); opacity: 0; transition: all 0.3s;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+        .toast.show { transform: translateY(0); opacity: 1; }
+        .toast.success { background: linear-gradient(135deg,#00b09b,#96c93d); }
+        .toast.error { background: linear-gradient(135deg,#ff6b6b,#ee5a5a); }
+
+        .empty-state { text-align: center; padding: 40px; color: #888; }
+        .empty-state svg { width: 60px; height: 60px; margin-bottom: 15px; opacity: 0.3; }
+
+        .search-box {
+            width: 100%; padding: 10px 14px; border: 2px solid #e1e5e9;
+            border-radius: 10px; font-size: 14px; margin-bottom: 15px; outline: none;
+        }
+        .search-box:focus { border-color: #667eea; }
+
+        .tag {
+            display: inline-block; padding: 2px 8px; border-radius: 4px;
+            font-size: 11px; font-weight: 600; margin-left: 6px;
+        }
+        .tag-green { background: #d4edda; color: #155724; }
+        .tag-blue { background: #cce5ff; color: #004085; }
+
+        .action-bar {
+            display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+
+<!-- 登录层 -->
+<div class="login-overlay" id="loginOverlay">
+    <div class="login-box">
+        <div style="font-size: 48px; margin-bottom: 10px;">🔐</div>
+        <h2>授权管理后台</h2>
+        <p>考试助手 v3.9.6</p>
+        <input type="password" id="adminPwd" placeholder="请输入管理密码" maxlength="20">
+        <button onclick="doLogin()">进入后台</button>
+        <div class="login-error" id="loginError">密码错误</div>
+        <div style="margin-top: 15px; font-size: 11px; color: #aaa;">
+            默认密码: <code>admin123</code>（建议部署后修改）
+        </div>
+    </div>
+</div>
+
+<div class="container" id="mainContent" style="display:none;">
+    <div class="header">
+        <h1>🎓 考试助手授权管理</h1>
+        <div style="display:flex; gap:10px; align-items:center;">
+            <span class="version">v3.9.6</span>
+            <button class="btn btn-secondary btn-sm" onclick="logout()">退出登录</button>
+        </div>
+    </div>
+
+    <div class="stats">
+        <div class="stat-card">
+            <div class="label">已授权用户</div>
+            <div class="value" id="statCount">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">白名单页面</div>
+            <div class="value" id="statWhitelist">0</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">配置版本</div>
+            <div class="value" style="font-size: 20px;">3.9.6</div>
+        </div>
+    </div>
+
+    <div class="main-grid">
+        <!-- 左侧：添加用户 -->
+        <div class="panel">
+            <h3>➕ 添加授权用户</h3>
+            <div class="form-group">
+                <label>身份证号（明文）</label>
+                <input type="text" id="inputIdCard" placeholder="18位身份证号" maxlength="18">
+            </div>
+            <div class="form-group">
+                <label>备注（可选）</label>
+                <input type="text" id="inputRemark" placeholder="例如：张三 / 某某煤矿">
+            </div>
+            <button class="btn btn-primary" onclick="addUser()">生成并添加</button>
+
+            <div id="addResult" style="display:none;">
+                <div class="result-box">
+                    <div style="margin-bottom:8px;"><strong>加密结果：</strong></div>
+                    <div id="encryptedResult" style="color:#667eea; font-weight:bold;"></div>
+                    <div style="margin-top:8px; font-size:11px; color:#888;" id="maskResult"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：用户列表 -->
+        <div class="panel">
+            <h3>👥 授权用户列表 <span class="tag tag-green" id="listCount">0人</span></h3>
+            <input type="text" class="search-box" id="searchBox" placeholder="🔍 搜索备注或加密ID..." oninput="renderList()">
+            <div class="action-bar">
+                <button class="btn btn-danger btn-sm" onclick="clearAll()">🗑️ 清空全部</button>
+                <button class="btn btn-secondary btn-sm" onclick="loadFromJson()">📥 导入JSON</button>
+            </div>
+            <div class="user-list" id="userList">
+                <div class="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                    <div>暂无授权用户</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-grid" style="margin-top: 20px;">
+        <!-- JSON 预览 -->
+        <div class="panel">
+            <h3>📄 auth.json 预览</h3>
+            <div class="action-bar">
+                <button class="btn btn-success btn-sm" onclick="copyJson()">📋 复制JSON</button>
+                <button class="btn btn-primary btn-sm" onclick="downloadJson()">💾 下载文件</button>
+            </div>
+            <div class="json-preview" id="jsonPreview"></div>
+            <div style="margin-top: 10px; font-size: 12px; color: #888;">
+                💡 提示：下载后上传到 GitHub 仓库根目录，覆盖原有的 auth.json 即可生效
+            </div>
+        </div>
+
+        <!-- 工具箱 -->
+        <div class="panel">
+            <h3>🛠️ 工具箱</h3>
+            <div class="form-group">
+                <label>身份证加密工具</label>
+                <input type="text" id="toolIdCard" placeholder="输入18位身份证号" maxlength="18">
+            </div>
+            <button class="btn btn-primary" onclick="encryptTool()">🔐 仅加密（不保存）</button>
+            <div id="toolResult" style="margin-top: 10px; display: none;">
+                <div class="result-box" id="toolResultBox"></div>
+            </div>
+
+            <div style="margin-top: 25px; padding-top: 20px; border-top: 2px solid #f0f2f5;">
+                <div class="form-group">
+                    <label>批量导入（每行一个身份证号）</label>
+                    <textarea id="batchInput" rows="4" style="width:100%; padding:12px; border:2px solid #e1e5e9; border-radius:10px; font-family:monospace; font-size:13px; resize:vertical;" placeholder="110101199001011234&#10;110101199001011235"></textarea>
+                </div>
+                <button class="btn btn-success" onclick="batchImport()">📥 批量导入</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ==================== 配置 ====================
+const ADMIN_PASSWORD = 'admin123';  // ← 部署前务必修改！
+const SECRET_KEY = 'ID_AUTH_KEY_2026_V3';
+
+// ==================== 数据存储 ====================
+let users = JSON.parse(localStorage.getItem('exam_auth_users') || '[]');
+
+// ==================== 加密算法（与脚本完全一致）====================
+function encryptIDCard(idCard) {
+    try {
+        idCard = idCard.replace(/[\s-]/g, '').toUpperCase();
+        if (!/^\d{15}$/.test(idCard) && !/^\d{17}[\dX]$/.test(idCard)) return null;
+
+        // 15位转18位
+        if (idCard.length === 15) {
+            idCard = idCard.substring(0, 6) + '19' + idCard.substring(6);
+            const weights = [7,9,10,5,8,4,2,1,6,3,7,9,10,5,8,4,2];
+            const checkCodes = ['1','0','X','9','8','7','6','5','4','3','2'];
+            let sum = 0;
+            for (let i = 0; i < 17; i++) sum += parseInt(idCard.charAt(i)) * weights[i];
+            idCard = idCard.substring(0, 17) + checkCodes[sum % 11];
+        }
+
+        let encrypted = '';
+        for (let i = 0; i < idCard.length; i++) {
+            encrypted += String.fromCharCode(idCard.charCodeAt(i) ^ SECRET_KEY.charCodeAt(i % SECRET_KEY.length));
+        }
+        let base64 = btoa(encrypted);
+        return base64.replace(/[^a-zA-Z0-9]/g, '').substring(0, 16);
+    } catch (e) { return null; }
+}
+
+function maskIDCard(idCard) {
+    if (!idCard) return '';
+    return idCard.length === 18
+        ? idCard.substring(0, 6) + '********' + idCard.substring(14)
+        : idCard.substring(0, 6) + '********';
+}
+
+// ==================== 登录 ====================
+function doLogin() {
+    const pwd = document.getElementById('adminPwd').value.trim();
+    if (pwd === ADMIN_PASSWORD) {
+        sessionStorage.setItem('exam_admin_logged', '1');
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('mainContent').style.display = 'block';
+        init();
+    } else {
+        const err = document.getElementById('loginError');
+        err.style.display = 'block';
+        document.getElementById('adminPwd').style.borderColor = '#ff4757';
+        setTimeout(() => { err.style.display = 'none'; document.getElementById('adminPwd').style.borderColor = '#e1e5e9'; }, 2000);
+    }
+}
+document.getElementById('adminPwd').addEventListener('keypress', e => { if (e.key === 'Enter') doLogin(); });
+
+function logout() {
+    sessionStorage.removeItem('exam_admin_logged');
+    location.reload();
+}
+
+// 自动登录
+if (sessionStorage.getItem('exam_admin_logged') === '1') {
+    document.getElementById('loginOverlay').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+}
+
+// ==================== 核心功能 ====================
+function init() {
+    updateStats();
+    renderList();
+    updateJsonPreview();
+}
+
+function saveUsers() {
+    localStorage.setItem('exam_auth_users', JSON.stringify(users));
+    updateStats();
+    renderList();
+    updateJsonPreview();
+}
+
+function updateStats() {
+    document.getElementById('statCount').textContent = users.length;
+    document.getElementById('listCount').textContent = users.length + '人';
+}
+
+function addUser() {
+    const input = document.getElementById('inputIdCard').value.trim();
+    const remark = document.getElementById('inputRemark').value.trim();
+    if (!input) { showToast('请输入身份证号', 'error'); return; }
+
+    const encrypted = encryptIDCard(input);
+    if (!encrypted) { showToast('身份证格式不正确', 'error'); return; }
+
+    if (users.some(u => u.encrypted === encrypted)) {
+        showToast('该用户已存在', 'error'); return;
+    }
+
+    users.push({
+        encrypted: encrypted,
+        plain: input,
+        remark: remark || '',
+        createdAt: new Date().toISOString().split('T')[0]
+    });
+    saveUsers();
+
+    document.getElementById('encryptedResult').textContent = encrypted;
+    document.getElementById('maskResult').textContent = '明文: ' + maskIDCard(input) + (remark ? ' | 备注: ' + remark : '');
+    document.getElementById('addResult').style.display = 'block';
+
+    document.getElementById('inputIdCard').value = '';
+    document.getElementById('inputRemark').value = '';
+    showToast('✅ 添加成功');
+}
+
+function deleteUser(index) {
+    if (!confirm('确定删除该授权用户？')) return;
+    users.splice(index, 1);
+    saveUsers();
+    showToast('🗑️ 已删除');
+}
+
+function clearAll() {
+    if (!confirm('确定清空所有授权用户？此操作不可恢复！')) return;
+    users = [];
+    saveUsers();
+    showToast('🗑️ 已全部清空');
+}
+
+function renderList() {
+    const list = document.getElementById('userList');
+    const keyword = document.getElementById('searchBox').value.trim().toLowerCase();
+    const filtered = keyword
+        ? users.filter(u => u.encrypted.toLowerCase().includes(keyword) || (u.remark && u.remark.toLowerCase().includes(keyword)))
+        : users;
+
+    if (filtered.length === 0) {
+        list.innerHTML = `
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                </svg>
+                <div>${keyword ? '未找到匹配结果' : '暂无授权用户'}</div>
+            </div>`;
+        return;
+    }
+
+    list.innerHTML = filtered.map((u, i) => {
+        const realIndex = users.indexOf(u);
+        return `
+        <div class="user-item">
+            <div class="user-info">
+                <div class="user-id">${u.encrypted}</div>
+                <div class="user-mask">${maskIDCard(u.plain)} ${u.remark ? '<span class="tag tag-blue">' + u.remark + '</span>' : ''} <span style="color:#aaa;">${u.createdAt}</span></div>
+            </div>
+            <div class="user-actions">
+                <button class="btn btn-secondary btn-sm" onclick="copyText('${u.encrypted}')">复制</button>
+                <button class="btn btn-danger btn-sm" onclick="deleteUser(${realIndex})">删除</button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function updateJsonPreview() {
+    const data = {
+        version: "3.9.6",
+        encryptedIDs: users.map(u => u.encrypted),
+        features: {
+            enableWhitelist: true,
+            maxActivations: 50,
+            activationLockHours: 24
+        },
+        notice: "",
+        updatedAt: new Date().toISOString().split('T')[0]
+    };
+    const json = JSON.stringify(data, null, 2);
+    document.getElementById('jsonPreview').innerHTML = syntaxHighlight(json);
+}
+
+function syntaxHighlight(json) {
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, match => {
+        let cls = 'json-number';
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) cls = 'json-key';
+            else cls = 'json-string';
+        } else if (/true|false/.test(match)) cls = 'json-boolean';
+        else if (/null/.test(match)) cls = 'json-boolean';
+        return '<span class="' + cls + '">' + match + '</span>';
+    });
+}
+
+function getAuthJson() {
+    return JSON.stringify({
+        version: "3.9.6",
+        encryptedIDs: users.map(u => u.encrypted),
+        features: {
+            enableWhitelist: true,
+            maxActivations: 50,
+            activationLockHours: 24
+        },
+        notice: "",
+        updatedAt: new Date().toISOString().split('T')[0]
+    }, null, 2);
+}
+
+function copyJson() {
+    navigator.clipboard.writeText(getAuthJson()).then(() => showToast('📋 JSON 已复制到剪贴板'));
+}
+
+function downloadJson() {
+    const blob = new Blob([getAuthJson()], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'auth.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('💾 文件已下载');
+}
+
+function copyText(text) {
+    navigator.clipboard.writeText(text).then(() => showToast('📋 已复制'));
+}
+
+function encryptTool() {
+    const input = document.getElementById('toolIdCard').value.trim();
+    if (!input) { showToast('请输入身份证号', 'error'); return; }
+    const encrypted = encryptIDCard(input);
+    if (!encrypted) { showToast('身份证格式不正确', 'error'); return; }
+    document.getElementById('toolResult').style.display = 'block';
+    document.getElementById('toolResultBox').innerHTML =
+        `<strong>加密结果：</strong>${encrypted}<br><strong>脱敏显示：</strong>${maskIDCard(input)}`;
+}
+
+function batchImport() {
+    const text = document.getElementById('batchInput').value.trim();
+    if (!text) { showToast('请输入身份证号列表', 'error'); return; }
+    const lines = text.split(/\n/).map(l => l.trim()).filter(l => l);
+    let added = 0, skipped = 0;
+    lines.forEach(line => {
+        const encrypted = encryptIDCard(line);
+        if (!encrypted) { skipped++; return; }
+        if (users.some(u => u.encrypted === encrypted)) { skipped++; return; }
+        users.push({
+            encrypted: encrypted,
+            plain: line,
+            remark: '',
+            createdAt: new Date().toISOString().split('T')[0]
+        });
+        added++;
+    });
+    saveUsers();
+    document.getElementById('batchInput').value = '';
+    showToast(`✅ 成功导入 ${added} 个，跳过 ${skipped} 个`);
+}
+
+function loadFromJson() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = event => {
+            try {
+                const data = JSON.parse(event.target.result);
+                if (!Array.isArray(data.encryptedIDs)) { showToast('JSON 格式不正确', 'error'); return; }
+                let added = 0;
+                data.encryptedIDs.forEach(enc => {
+                    if (!users.some(u => u.encrypted === enc)) {
+                        users.push({ encrypted: enc, plain: '', remark: '导入', createdAt: new Date().toISOString().split('T')[0] });
+                        added++;
+                    }
+                });
+                saveUsers();
+                showToast(`📥 导入成功，新增 ${added} 个用户`);
+            } catch (err) { showToast('文件解析失败', 'error'); }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+
+function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast ' + type + ' show';
+    setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// 初始化
+if (sessionStorage.getItem('exam_admin_logged') === '1') {
+    init();
+}
+</script>
+</body>
+</html>
