@@ -39,9 +39,9 @@
     'use strict';
 
     // ==================== 配置：改成你的 GitHub 仓库 ====================
-    const GITHUB_USER = 'YOUR_USERNAME';      // ← 改成你的 GitHub 用户名
-    const GITHUB_REPO = 'REPO_NAME';          // ← 改成你的仓库名
-    const GITHUB_BRANCH = 'main';             // ← 分支名，通常是 main 或 master
+    const GITHUB_USER = 'wfxx2026';      // 
+    const GITHUB_REPO = 'exam-helper';          // 
+    const GITHUB_BRANCH = 'main';             // 
 
     // 远程配置地址（会自动加时间戳防缓存）
     const REMOTE_URLS = [
